@@ -19,6 +19,7 @@
 //
 // Run: mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
+import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +29,8 @@ const IMAGE_NAME = "entry.png";
 // 0a6877b102ea3dc0b2a858280cbbf8a49481e778d5396c722fc70d8621e7d29e
 // — comfortably under the competition's 1 MiB cap.
 const EXPECTED_BYTES = 267459;
+const EXPECTED_SHA256 =
+  "0a6877b102ea3dc0b2a858280cbbf8a49481e778d5396c722fc70d8621e7d29e";
 const SIZE_LIMIT_BYTES = 1024 * 1024;
 
 const repoRoot = dirname(fileURLToPath(import.meta.url));
@@ -53,6 +56,17 @@ copyFileSync(sourcePath, outputPath);
 
 if (statSync(outputPath).size !== EXPECTED_BYTES) {
   throw new Error("copy failed: output size does not match the source.");
+}
+
+// A size match alone does not prove the copy is intact, so hash the output
+// too and refuse to finish if even one byte differs from the bundled image.
+const writtenHash = createHash("sha256")
+  .update(readFileSync(outputPath))
+  .digest("hex");
+if (writtenHash !== EXPECTED_SHA256) {
+  throw new Error(
+    `copy failed: output sha256 ${writtenHash} does not match ${EXPECTED_SHA256}.`,
+  );
 }
 
 console.log(`wrote ${outputPath} (${EXPECTED_BYTES} bytes)`);
